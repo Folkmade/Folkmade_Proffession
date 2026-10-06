@@ -20,7 +20,7 @@
     </button>
     <div id="desktopSearch" class="search-wrap">
       <span class="search-icon">⌕</span>
-      <input id="searchInput" placeholder="Search for pots, pickles, woodcraft, teas..." aria-label="Search products">
+      <input id="searchInput" placeholder="Search for pots, woodcraft, textiles..." aria-label="Search products">
       <button onclick="clearSearch()" aria-label="Clear search">×</button>
     </div>
     <nav class="nav-actions">
@@ -33,25 +33,20 @@
   <div class="header-nav"><div class="header-nav-inner">
     <button onclick="showView('shop')">All Products</button>
     <button onclick="setCategory('Handmade Decor')">Handmade Decor</button>
-    <button onclick="setCategory('Traditional Edibles')">Traditional Edibles</button>
     <button onclick="showView('about')">Our Artisans</button>
     <button onclick="showView('orders')">My Orders</button>
     <button onclick="toggleAdmin()">Seller / Admin</button>
   </div></div>
 </header>
 <main id="app"></main>
-
 <div id="overlay" class="overlay hidden" onclick="closeCart()"></div>
 <aside id="cartPanel" class="cart-panel">
   <div class="cart-head"><div><span class="eyebrow">YOUR BAG</span><h2>Shopping Bag</h2></div><button onclick="closeCart()">×</button></div>
   <div id="cartItems" class="cart-items"></div>
   <div class="cart-footer"><div><span>Subtotal</span><b id="cartSubtotal">₹0</b></div><div><span>Shipping</span><b id="shipping">Free</b></div><div class="grand"><span>Total</span><b id="grandTotal">₹0</b></div><button class="primary full" onclick="checkout()">Checkout →</button></div>
 </aside>
-
 <div id="modal" class="modal hidden" onclick="closeModal(event)"><div class="modal-card"><button class="modal-close" onclick="hideModal()">×</button><div id="modalContent"></div></div></div>
-<div id="authModal" class="modal hidden" onclick="closeAuth(event)">
-  <div class="modal-card auth-box"><button class="modal-close" onclick="closeAuth()">×</button><div class="auth-side"><div class="auth-logo">FM</div><h3>Made with heritage</h3><p>Shop directly from skilled Indian makers and bring a piece of their story home.</p></div><div id="authContent"></div></div>
-</div>
+<div id="authModal" class="modal hidden" onclick="closeAuth(event)"><div class="modal-card auth-box"><button class="modal-close" onclick="closeAuth()">×</button><div class="auth-side"><div class="auth-logo">FM</div><h3>Made with heritage</h3><p>Shop directly from skilled Indian makers and bring a piece of their story home.</p></div><div id="authContent"></div></div></div>
 <script src="script.js"></script>
 </body>
 </html>
