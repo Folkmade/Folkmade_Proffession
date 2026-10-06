@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FolkMade — Handcrafted Traditions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="toast" class="toast hidden"></div>
+<div class="top-strip"><span>✦</span> Authentic handmade products from Indian artisans <span>•</span> Free shipping on orders over ₹999 <span>•</span> Secure checkout</div>
+<header class="header">
+  <div class="header-inner">
+    <button class="brand" onclick="showView('shop')" aria-label="FolkMade Home">
+      <div class="brand-mark"><img src="D:/cinematic/logo.png" alt="FolkMade Logo"></div>
+      <div><div class="brand-name">FolkMade</div><div class="brand-tag">Handcrafted Traditions</div></div>
+    </button>
+    <div id="desktopSearch" class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="searchInput" placeholder="Search for pots, pickles, woodcraft, teas..." aria-label="Search products">
+      <button onclick="clearSearch()" aria-label="Clear search">×</button>
+    </div>
+    <nav class="nav-actions">
+      <button id="shopBtn" class="nav-btn active" onclick="showView('shop')">Shop</button>
+      <button class="icon-btn" onclick="showView('wishlist')" title="Saved Wishlist">♡<span id="wishCount" class="count"></span></button>
+      <button class="icon-btn" onclick="openCart()" title="Shopping Bag">🛍<span id="cartCount" class="count"></span></button>
+      <button id="accountBtn" class="account-btn" onclick="openAuth()">👤 Login / Register</button>
+    </nav>
+  </div>
+  <div class="header-nav"><div class="header-nav-inner">
+    <button onclick="showView('shop')">All Products</button>
+    <button onclick="setCategory('Handmade Decor')">Handmade Decor</button>
+    <button onclick="setCategory('Traditional Edibles')">Traditional Edibles</button>
+    <button onclick="showView('about')">Our Artisans</button>
+    <button onclick="showView('orders')">My Orders</button>
+    <button onclick="toggleAdmin()">Seller / Admin</button>
+  </div></div>
+</header>
+<main id="app"></main>
+
+<div id="overlay" class="overlay hidden" onclick="closeCart()"></div>
+<aside id="cartPanel" class="cart-panel">
+  <div class="cart-head"><div><span class="eyebrow">YOUR BAG</span><h2>Shopping Bag</h2></div><button onclick="closeCart()">×</button></div>
+  <div id="cartItems" class="cart-items"></div>
+  <div class="cart-footer"><div><span>Subtotal</span><b id="cartSubtotal">₹0</b></div><div><span>Shipping</span><b id="shipping">Free</b></div><div class="grand"><span>Total</span><b id="grandTotal">₹0</b></div><button class="primary full" onclick="checkout()">Checkout →</button></div>
+</aside>
+
+<div id="modal" class="modal hidden" onclick="closeModal(event)"><div class="modal-card"><button class="modal-close" onclick="hideModal()">×</button><div id="modalContent"></div></div></div>
+<div id="authModal" class="modal hidden" onclick="closeAuth(event)">
+  <div class="modal-card auth-box"><button class="modal-close" onclick="closeAuth()">×</button><div class="auth-side"><div class="auth-logo">FM</div><h3>Made with heritage</h3><p>Shop directly from skilled Indian makers and bring a piece of their story home.</p></div><div id="authContent"></div></div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
