@@ -56,38 +56,23 @@ function mapProductRow(row){
 }
 
 async function loadProductsFromDatabase(){
-  const {data,error} = await supabaseClient.from('products').select('*').neq('category','Traditional Edibles').order('id',{ascending:true});
+  const {data,error} = await supabaseClient
+    .from('products')
+    .select('*')
+    .neq('category','Traditional Edibles')
+    .order('id',{ascending:true});
+
   if(error){
-    products = fallbackProducts.filter(p => p && p.title);
+    console.error('PRODUCT LOAD ERROR:', error);
+    products = [];
     return;
   }
-  if(!data || !data.length){
-    const seed = fallbackProducts.map(p=>({
-      title:p.title, category:p.category, price:p.price,
-      original_price:p.originalPrice, rating:p.rating,
-      reviews_count:p.reviewsCount, artisan_name:p.artisanName,
-      artisan_region:p.artisanRegion, image:p.image
-    }));
-    const {data:seeded,error:seedError} = await supabaseClient.from('products').insert(seed).select('*');
-    if(seedError){
-      products = fallbackProducts.filter(p => p && p.title);
-      return;
-    }
-    products = (seeded || []).filter(row => row.category !== 'Traditional Edibles').map(row=>{
-      const fallback = fallbackProducts.find(p=>p.title===row.title);
-      if(fallback && !productMeta[String(row.id)]){
-        productMeta[String(row.id)] = {
-          subCategory:fallback.subCategory,description:fallback.description,
-          materials:fallback.materials,inStock:fallback.inStock,
-          isFeatured:fallback.isFeatured,isBestseller:fallback.isBestseller
-        };
-      }
-      return mapProductRow(row);
-    });
-    saveProductMeta();
-  } else {
-    products = data.map(mapProductRow).filter(p => p && p.title && p.category !== 'Traditional Edibles');
-  }
+
+  products = (data || [])
+    .filter(row => row && row.title && row.category !== 'Traditional Edibles')
+    .map(mapProductRow);
+
+  saveProductMeta();
 }
 
 async function getProfileByEmail(email){
@@ -97,10 +82,23 @@ async function getProfileByEmail(email){
 }
 
 function makeCurrentUser(profile){
-  return profile ? {
-    id:profile.id,name:profile.name,email:profile.email,
-    phone:profile.phone || '',role:profile.role || 'user'
+  const user = profile ? {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    phone: profile.phone || '',
+    role: profile.role || 'user'
   } : null;
+
+  const addBtn = $('addProductBtn');
+  if(addBtn){
+    addBtn.style.display =
+      (user && (user.role === 'seller' || user.role === 'admin'))
+        ? 'inline-flex'
+        : 'none';
+  }
+
+  return user;
 }
 
 async function loadWishlist(){
@@ -335,11 +333,14 @@ function renderSeller(){
           <h2>Seller Dashboard</h2>
           <p>Welcome, ${currentUser ? currentUser.name : 'Seller'}.</p>
         </div>
+        <button class="primary" onclick="openAdd()">+ Add Product</button>
       </div>
+
       <div class="info-card">
         <h3>Sell Your Product</h3>
-        <p>Your seller account is ready. Product listing and order management can be connected to the database in the next step.</p>
-        <button class="primary" onclick="showView('shop')">Back to Marketplace</button>
+        <p>Add your handcrafted product to the FolkMade marketplace.</p>
+        <button class="primary" onclick="openAdd()">+ Add Product</button>
+        <button class="secondary" onclick="showView('shop')" style="margin-left:10px">Back to Marketplace</button>
       </div>
     </div>`;
 }
@@ -457,22 +458,91 @@ $('modal').classList.remove('hidden')
 }
 async function saveProduct(e,id){
   e.preventDefault();
-  const old=id?products.find(x=>String(x.id)===String(id)):null;
-  const title=$('f-title').value.trim(), category=$('f-cat').value, subCategory=$('f-sub').value||'General', price=+$('f-price').value, originalPrice=+$('f-original').value||Math.round(price*1.2);
-  const dbProduct={title,category,price,original_price:originalPrice,rating:old?.rating||5,reviews_count:old?.reviewsCount||0,artisan_name:$('f-artisan').value.trim(),artisan_region:$('f-region').value.trim(),image:$('f-image').value||'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=600'};
-  let row,error;
+
+  const old = id ? products.find(x => String(x.id) === String(id)) : null;
+
+  const title = $('f-title').value.trim();
+  const category = $('f-cat').value;
+  const subCategory = $('f-sub').value || 'General';
+  const price = Number($('f-price').value);
+  const originalPrice = Number($('f-original').value) || Math.round(price * 1.2);
+
+  const dbProduct = {
+    title,
+    category,
+    price,
+    original_price: originalPrice,
+    rating: old?.rating || 5,
+    reviews_count: old?.reviewsCount || 0,
+    created_at: new Date().toISOString(),
+    artisan_name: $('f-artisan').value.trim(),
+    artisan_region: $('f-region').value.trim(),
+    image: $('f-image').value ||
+      'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=600'
+  };
+
+  let row = null;
+  let error = null;
+
   if(id){
-    const result=await supabaseClient.from('products').update(dbProduct).eq('id',Number(id)).select('*').single(); row=result.data; error=result.error;
+    const result = await supabaseClient
+      .from('products')
+      .update(dbProduct)
+      .eq('id', Number(id))
+      .select('*')
+      .single();
+
+    row = result.data;
+    error = result.error;
   }else{
-    const result=await supabaseClient.from('products').insert(dbProduct).select('*').single(); row=result.data; error=result.error;
+    const result = await supabaseClient
+      .from('products')
+      .insert([dbProduct])
+      .select('*')
+      .single();
+
+    row = result.data;
+    error = result.error;
   }
-  if(error||!row){toast('Product could not be saved to database.');return;}
-  productMeta[String(row.id)]={subCategory,description:$('f-desc').value,materials:$('f-materials').value,inStock:+$('f-stock').value||10,isFeatured:old?.isFeatured||false,isBestseller:old?.isBestseller||false};
+
+  if(error){
+    console.error('PRODUCT DATABASE ERROR:', error);
+    toast('Database Error: ' + error.message);
+    return;
+  }
+
+  if(!row){
+    toast('Product was not returned by database.');
+    return;
+  }
+
+  productMeta[String(row.id)] = {
+    subCategory,
+    description: $('f-desc').value,
+    materials: $('f-materials').value,
+    inStock: Number($('f-stock').value) || 10,
+    isFeatured: old?.isFeatured || false,
+    isBestseller: old?.isBestseller || false
+  };
+
   saveProductMeta();
-  const mapped=mapProductRow(row);
-  const idx=products.findIndex(x=>String(x.id)===String(row.id));
-  if(idx>=0) products[idx]=mapped; else products.unshift(mapped);
-  hideModal();render();toast(id?'Product details updated successfully!':'New handcrafted product added to store!');
+
+  const mapped = mapProductRow(row);
+  const idx = products.findIndex(x => String(x.id) === String(row.id));
+
+  if(idx >= 0){
+    products[idx] = mapped;
+  }else{
+    products.unshift(mapped);
+  }
+
+  hideModal();
+  render();
+
+  toast(id
+    ? 'Product details updated successfully!'
+    : 'New handcrafted product added to store!'
+  );
 }
 async function deleteProduct(id){
   if(!confirm('Are you sure you want to delete this product from the marketplace?'))return;
