@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <div id="toast" class="toast hidden"></div>
@@ -28,6 +28,7 @@
       <button class="icon-btn" onclick="showView('wishlist')" title="Saved Wishlist">♡<span id="wishCount" class="count"></span></button>
       <button class="icon-btn" onclick="openCart()" title="Shopping Bag">🛍<span id="cartCount" class="count"></span></button>
       <button id="accountBtn" class="account-btn" onclick="openAuth()">👤 Login / Register</button>
+      <button id="dashboardBtn" class="account-btn" onclick="openDashboard()" style="display:none;">Dashboard</button>
       <button id="addProductBtn" class="account-btn" onclick="openAdd()" style="display:none;">+ Add Product</button>
     </nav>
   </div>

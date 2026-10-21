@@ -20,6 +20,33 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLI
 const ORDER_ITEMS_CACHE_KEY = 'folkmade_order_items_cache';
 const PRODUCT_META_KEY = 'folkmade_product_meta';
 let currentUser = null;
+// Dynamic artisan data loaded from Supabase
+let artisans = [];
+
+async function loadArtisansFromDatabase() {
+  const { data, error } = await supabaseClient
+    .from('users')
+    .select('id, name, email, phone, role')
+    .eq('role', 'seller')
+    .order('id', { ascending: true });
+
+  if (error) {
+    console.error('ARTISAN LOAD ERROR:', error);
+    artisans = [];
+    return;
+  }
+
+  artisans = (data || []).map(seller => ({
+    id: seller.id,
+    name: seller.name || 'FolkMade Seller',
+    specialty: 'Handmade Products',
+    region: 'India',
+    experience: 'FolkMade Seller',
+    status: 'Registered Seller',
+    bio: 'Registered seller on the FolkMade marketplace.',
+    productsCount: 0
+  }));
+}
 let productMeta = {};
 try { productMeta = JSON.parse(localStorage.getItem(PRODUCT_META_KEY) || '{}'); } catch(e) { productMeta = {}; }
 
@@ -150,6 +177,7 @@ async function initFolkMade(){
       }catch(e){ currentUser=null; }
     }
     await loadProductsFromDatabase();
+    await loadArtisansFromDatabase();
   }catch(e){
     products=[...fallbackProducts];
     
@@ -162,8 +190,10 @@ function money(n){return '₹'+Number(n).toLocaleString('en-IN')}
 function toast(msg){$('toast').textContent=msg;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),2500)}
 function showView(v){state.view=v;render();window.scrollTo({top:0,behavior:'smooth'})}
 async function toggleAdmin(){
-  if(currentUser && currentUser.role==='admin'){ await loadAdminOrders(); showView('admin'); }
-  else openAuth();
+  if(currentUser && currentUser.role==='admin'){
+    showView('admin');
+    loadAdminOrders().then(()=>{ if(state.view==='admin') renderAdmin(); }).catch(()=>toast('Orders could not be loaded.'));
+  } else openAuth();
 }
 function clearSearch(){state.search='';$('searchInput').value='';renderShop()}
 function setCategory(c){state.category=c;renderShop()}
@@ -215,6 +245,8 @@ $('app').innerHTML=`<div class="container">
 <div class="artisan-list">${artisans.map(a=>`<div class="artisan-card"><span class="verified">✓ ${a.status}</span><h3>${a.name}</h3><p><b>${a.specialty}</b></p><p>${a.region} · ${a.experience}</p><p style="color:#78716c;font-size:13px">${a.bio}</p><small>${a.productsCount} products</small></div>`).join('')}</div></div>`
 }
 function renderAdmin(){
+if (!Array.isArray(artisans)) artisans = [];
+if (!Array.isArray(products)) products = [];
 let productRows=products.map(p=>`<tr><td>${p.title}</td><td>${p.category}</td><td>${money(p.price)}</td><td>${p.inStock}</td><td><button class="small-btn" onclick="openEdit('${p.id}')">Edit</button> <button class="small-btn danger" onclick="deleteProduct('${p.id}')">Delete</button></td></tr>`).join('');
 let orderRows=state.orders.map(o=>`<tr><td>${o.id}</td><td>${o.customer}</td><td>${money(o.amount)}</td><td>${o.items}</td><td>${o.status}</td><td>${o.date}</td><td>${o.paymentMethod}</td></tr>`).join('');
 $('app').innerHTML=`<div class="container">
@@ -323,7 +355,36 @@ async function logoutAccount(){
   currentUser=null; localStorage.removeItem('folkmade_current_user'); state.wishlist=[]; state.view='shop'; render(); toast('Logged out successfully.');
 }
 
-function renderAccountButton(){const btn=$('accountBtn');if(!btn)return;if(currentUser){btn.textContent=`👤 ${currentUser.name}`;btn.onclick=()=>showProfile()}else{btn.textContent='👤 Login / Register';btn.onclick=openAuth}}
+function renderAccountButton(){
+  const btn=$('accountBtn');
+  const dashboardBtn=$('dashboardBtn');
+  const addProductBtn=$('addProductBtn');
+  if(btn){
+    if(currentUser){btn.textContent=`👤 ${currentUser.name}`;btn.onclick=()=>showProfile();}
+    else{btn.textContent='👤 Login / Register';btn.onclick=openAuth;}
+  }
+  if(dashboardBtn){
+    const isAdmin=!!(currentUser && currentUser.role==='admin');
+    dashboardBtn.style.display=isAdmin?'inline-flex':'none';
+    dashboardBtn.onclick=openDashboard;
+  }
+  if(addProductBtn){
+    const canAdd=!!(currentUser && (currentUser.role==='admin'||currentUser.role==='seller'));
+    addProductBtn.style.display=canAdd?'inline-flex':'none';
+  }
+}
+async function openDashboard(){
+  if(!currentUser){openAuth();return;}
+  if(currentUser.role==='admin'){
+    // Show the dashboard immediately; a slow/blocked orders query must not stop navigation.
+    showView('admin');
+    loadAdminOrders().then(()=>{ if(state.view==='admin') renderAdmin(); }).catch(()=>toast('Orders could not be loaded.'));
+  }else if(currentUser.role==='seller'){
+    showView('seller');
+  }else{
+    showProfile();
+  }
+}
 function showProfile(){$('app').innerHTML=`<div class="container"><div class="section-title"><div><span class="eyebrow" style="color:#166534!important">MY ACCOUNT</span><h2 style="color:#14532d!important">My Profile</h2><p style="color:#292524!important">Your FolkMade account details.</p></div></div><div class="info-card" style="background:#ffffff!important;color:#292524!important"><h3 style="color:#14532d!important">Profile Information</h3><p style="color:#292524!important"><b style="color:#14532d!important">Name:</b> ${currentUser.name}</p><p style="color:#292524!important"><b style="color:#14532d!important">Email:</b> ${currentUser.email}</p><p style="color:#292524!important"><b style="color:#14532d!important">Account Type:</b> ${currentUser.role}</p><button class="primary" onclick="showView('orders')">My Orders</button><button class="profile-btn" onclick="showView('shop')" style="margin-left:10px">Continue Shopping</button><button class="profile-btn" onclick="logoutAccount()" style="margin-left:10px">Logout</button></div></div>`}
 function renderSeller(){
   $('app').innerHTML = `
@@ -441,108 +502,125 @@ function openAdd(){showForm(null)}
 function openEdit(id){showForm(products.find(p=>p.id===id))}
 function showForm(p){
 p=p||resetForm();
-$('modalContent').innerHTML=`<h2 style="font-family:Playfair Display">${p.id?'Edit Product':'Add Product'}</h2><form onsubmit="saveProduct(event,'${p.id||''}')"><div class="form-grid">
+$('modalContent').innerHTML=`<h2 style="font-family:Playfair Display">${p.id?'Edit Product':'Add Product'}</h2>
+<form id="productForm" onsubmit="saveProduct(event,'${p.id||''}')"><div class="form-grid">
 <div class="field"><label>Title *</label><input id="f-title" value="${p.title||''}" required></div>
-<div class="field"><label>Category</label><select id="f-cat"><option ${p.category==='Handmade Decor'?'selected':''}>Handmade Decor</option></select></div>
+<div class="field"><label>Category</label><select id="f-cat"><option value="Handmade Decor" ${p.category==='Handmade Decor'?'selected':''}>Handmade Decor</option></select></div>
 <div class="field"><label>Sub Category</label><input id="f-sub" value="${p.subCategory||''}"></div>
-<div class="field"><label>Price *</label><input id="f-price" type="number" value="${p.price||''}" required></div>
-<div class="field"><label>Original Price</label><input id="f-original" type="number" value="${p.originalPrice||''}"></div>
-<div class="field"><label>Stock</label><input id="f-stock" type="number" value="${p.inStock??10}"></div>
+<div class="field"><label>Price *</label><input id="f-price" type="number" min="1" value="${p.price||''}" required></div>
+<div class="field"><label>Original Price</label><input id="f-original" type="number" min="1" value="${p.originalPrice||''}"></div>
+<div class="field"><label>Stock</label><input id="f-stock" type="number" min="0" value="${p.inStock??10}"></div>
 <div class="field"><label>Artisan Name *</label><input id="f-artisan" value="${p.artisanName||''}" required></div>
 <div class="field"><label>Artisan Region</label><input id="f-region" value="${p.artisanRegion||''}"></div>
-<div class="field full-field"><label>Image URL</label><input id="f-image" value="${p.image||''}"></div>
+<div class="field full-field"><label>Product Photo — Gallery / Camera</label>
+<input id="f-image-file" type="file" accept="image/*" capture="environment" aria-label="Choose product photo">
+<small class="image-help">Choose a photo from your phone gallery, or use the camera if your browser offers that option. Maximum 10 MB.</small>
+<div style="margin-top:12px"><img id="f-image-preview" src="${p.image||''}" alt="Product photo preview" style="max-width:180px;max-height:180px;object-fit:contain;border-radius:10px;${p.image?'':'display:none;'}"></div>
+<label style="margin-top:12px">Or use an Image URL</label><input id="f-image" type="url" value="${p.image||''}" placeholder="https://example.com/photo.jpg">
+</div>
 <div class="field full-field"><label>Description</label><textarea id="f-desc">${p.description||''}</textarea></div>
 <div class="field full-field"><label>Materials</label><input id="f-materials" value="${p.materials||''}"></div>
-</div><button class="primary full" type="submit">Save Product</button></form>`;
-$('modal').classList.remove('hidden')
+</div><button id="saveProductBtn" class="primary full" type="submit">Save Product</button></form>`;
+const fileInput=$('f-image-file');
+const preview=$('f-image-preview');
+const urlInput=$('f-image');
+fileInput.addEventListener('change',()=>{
+  const file=fileInput.files && fileInput.files[0];
+  if(!file)return;
+  if(!file.type.startsWith('image/')){toast('Please select a valid image file.');fileInput.value='';return;}
+  if(file.size>10*1024*1024){toast('Image must be smaller than 10 MB.');fileInput.value='';return;}
+  preview.src=URL.createObjectURL(file);
+  preview.style.display='block';
+  urlInput.value='';
+});
+urlInput.addEventListener('input',()=>{
+  if(urlInput.value.trim()){
+    fileInput.value='';
+    preview.src=urlInput.value.trim();
+    preview.style.display='block';
+  }
+});
+$('modal').classList.remove('hidden');
 }
+
+async function uploadProductImage(file){
+  if(!file)return null;
+  if(!file.type.startsWith('image/'))throw new Error('Please select a valid image file.');
+  if(file.size>10*1024*1024)throw new Error('Image must be smaller than 10 MB.');
+  const cleanName=(file.name||'product-image').replace(/[^a-zA-Z0-9._-]/g,'-');
+  const unique=(window.crypto && crypto.randomUUID)?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const filePath=`${unique}-${cleanName}`;
+  const {data,error}=await supabaseClient.storage.from('product-images').upload(filePath,file,{
+    cacheControl:'3600',upsert:false,contentType:file.type
+  });
+  if(error){
+    if(error.message && /row-level security|permission|not authorized|unauthorized/i.test(error.message)){
+      throw new Error('Photo upload permission denied. Sign in as a registered Seller and check the product-images Storage INSERT policy for authenticated users.');
+    }
+    throw new Error('Photo upload failed: '+error.message);
+  }
+  const {data:publicData}=supabaseClient.storage.from('product-images').getPublicUrl(data.path);
+  if(!publicData?.publicUrl)throw new Error('Could not create a public photo URL.');
+  return publicData.publicUrl;
+}
+
 async function saveProduct(e,id){
   e.preventDefault();
-
-  const old = id ? products.find(x => String(x.id) === String(id)) : null;
-
-  const title = $('f-title').value.trim();
-  const category = $('f-cat').value;
-  const subCategory = $('f-sub').value || 'General';
-  const price = Number($('f-price').value);
-  const originalPrice = Number($('f-original').value) || Math.round(price * 1.2);
-
-  const dbProduct = {
-    title,
-    category,
-    price,
-    original_price: originalPrice,
-    rating: old?.rating || 5,
-    reviews_count: old?.reviewsCount || 0,
-    created_at: new Date().toISOString(),
-    artisan_name: $('f-artisan').value.trim(),
-    artisan_region: $('f-region').value.trim(),
-    image: $('f-image').value ||
-      'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=600'
-  };
-
-  let row = null;
-  let error = null;
-
-  if(id){
-    const result = await supabaseClient
-      .from('products')
-      .update(dbProduct)
-      .eq('id', Number(id))
-      .select('*')
-      .single();
-
-    row = result.data;
-    error = result.error;
-  }else{
-    const result = await supabaseClient
-      .from('products')
-      .insert([dbProduct])
-      .select('*')
-      .single();
-
-    row = result.data;
-    error = result.error;
+  const old=id?products.find(x=>String(x.id)===String(id)):null;
+  const saveButton=$('saveProductBtn');
+  const fileInput=$('f-image-file');
+  const selectedFile=fileInput?.files?.[0]||null;
+  const title=$('f-title').value.trim();
+  const category=$('f-cat').value;
+  const subCategory=$('f-sub').value.trim()||'General';
+  const price=Number($('f-price').value);
+  const originalPrice=Number($('f-original').value)||Math.round(price*1.2);
+  if(!title||!Number.isFinite(price)||price<=0){toast('Please enter a product title and valid price.');return;}
+  saveButton.disabled=true;
+  saveButton.textContent=selectedFile?'Uploading photo...':'Saving product...';
+  let imageUrl=$('f-image').value.trim()||(old?.image||'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=600');
+  try{
+    if(selectedFile){
+      saveButton.textContent='Uploading photo...';
+      imageUrl=await uploadProductImage(selectedFile);
+    }
+    const dbProduct={
+      title,category,price,original_price:originalPrice,
+      rating:old?.rating||5,reviews_count:old?.reviewsCount||0,
+      created_at:new Date().toISOString(),
+      artisan_name:$('f-artisan').value.trim(),
+      artisan_region:$('f-region').value.trim(),
+      image:imageUrl
+    };
+    saveButton.textContent='Saving product...';
+    let row=null,error=null;
+    if(id){
+      const result=await supabaseClient.from('products').update(dbProduct).eq('id',Number(id)).select('*').single();
+      row=result.data;error=result.error;
+    }else{
+      const result=await supabaseClient.from('products').insert([dbProduct]).select('*').single();
+      row=result.data;error=result.error;
+    }
+    if(error){console.error('PRODUCT DATABASE ERROR:',error);toast('Database Error: '+error.message);return;}
+    if(!row){toast('Product was not returned by database.');return;}
+    productMeta[String(row.id)]={
+      subCategory,description:$('f-desc').value,materials:$('f-materials').value,
+      inStock:Number($('f-stock').value)||10,
+      isFeatured:old?.isFeatured||false,isBestseller:old?.isBestseller||false
+    };
+    saveProductMeta();
+    const mapped=mapProductRow(row);
+    const idx=products.findIndex(x=>String(x.id)===String(row.id));
+    if(idx>=0)products[idx]=mapped;else products.unshift(mapped);
+    hideModal();render();
+    toast(id?'Product details updated successfully!':'New handcrafted product added to store!');
+  }catch(error){
+    console.error('PRODUCT SAVE / IMAGE UPLOAD ERROR:',error);
+    toast(error.message||'Could not save product. Please try again.');
+  }finally{
+    const button=$('saveProductBtn');
+    if(button){button.disabled=false;button.textContent='Save Product';}
   }
-
-  if(error){
-    console.error('PRODUCT DATABASE ERROR:', error);
-    toast('Database Error: ' + error.message);
-    return;
-  }
-
-  if(!row){
-    toast('Product was not returned by database.');
-    return;
-  }
-
-  productMeta[String(row.id)] = {
-    subCategory,
-    description: $('f-desc').value,
-    materials: $('f-materials').value,
-    inStock: Number($('f-stock').value) || 10,
-    isFeatured: old?.isFeatured || false,
-    isBestseller: old?.isBestseller || false
-  };
-
-  saveProductMeta();
-
-  const mapped = mapProductRow(row);
-  const idx = products.findIndex(x => String(x.id) === String(row.id));
-
-  if(idx >= 0){
-    products[idx] = mapped;
-  }else{
-    products.unshift(mapped);
-  }
-
-  hideModal();
-  render();
-
-  toast(id
-    ? 'Product details updated successfully!'
-    : 'New handcrafted product added to store!'
-  );
 }
 async function deleteProduct(id){
   if(!confirm('Are you sure you want to delete this product from the marketplace?'))return;
